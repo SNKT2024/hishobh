@@ -1,19 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Account, OverviewMetrics } from "@/types";
+import { Account, AccountType, OverviewMetrics } from "@/types";
 import { DonutChart } from "./DonutChart";
+import { BrandLogo } from "@/components/accounts/BrandLogo";
 import { formatCurrency } from "@/lib/utils";
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  Banknote,
-  Building2,
   ChevronLeft,
   ChevronRight,
-  CreditCard,
   Globe,
-  WalletCards,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -108,20 +105,6 @@ export function OverviewCarousel({
     onSelectAccount(slides[prev].id);
   };
 
-  const getAccountIcon = (type: string) => {
-    switch (type) {
-      case "bank":
-        return <Building2 className="h-4 w-4" />;
-      case "card":
-        return <CreditCard className="h-4 w-4" />;
-      case "wallet":
-        return <WalletCards className="h-4 w-4" />;
-      case "cash":
-        return <Banknote className="h-4 w-4" />;
-      default:
-        return <Globe className="h-4 w-4" />;
-    }
-  };
 
   return (
     <div className="relative w-full">
@@ -193,16 +176,18 @@ export function OverviewCarousel({
               {/* Card Header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
-                  <div
-                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0"
-                    style={
-                      slide.color
-                        ? { backgroundColor: `${slide.color}20`, color: slide.color }
-                        : undefined
-                    }
-                  >
-                    {getAccountIcon(slide.type)}
-                  </div>
+                  {slide.id === "all" ? (
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+                      <Globe className="h-4 w-4" />
+                    </div>
+                  ) : (
+                    <BrandLogo
+                      type={slide.type as AccountType}
+                      institutionName={slide.institution}
+                      name={slide.name}
+                      size="md"
+                    />
+                  )}
                   <div>
                     <h3 className="font-semibold text-foreground text-sm sm:text-base leading-tight">
                       {slide.name}

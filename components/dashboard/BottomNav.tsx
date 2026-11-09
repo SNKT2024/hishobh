@@ -38,7 +38,7 @@ export function BottomNav({
     { id: "home", label: "Home", icon: Home, href: "/dashboard" },
     { id: "stats", label: "Stats", icon: BarChart3, href: "/dashboard" },
     { id: "add", label: "Add", icon: Plus, isAction: true },
-    { id: "accounts", label: "Accounts", icon: WalletCards, href: "/dashboard" },
+    { id: "accounts", label: "Accounts", icon: WalletCards, href: "/accounts" },
     { id: "settings", label: "Settings", icon: Settings, href: "/settings" },
   ];
 

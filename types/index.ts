@@ -26,6 +26,8 @@ export interface Account {
   institution_name?: string | null;
   logo_url?: string | null;
   color?: string | null;
+  mask_last4?: string | null;
+  initial_balance?: number;
   created_at: string;
   // Computed / summary fields
   balance?: number;
@@ -115,6 +117,20 @@ export interface CreateAccountDTO {
   institution_name?: string;
   logo_url?: string;
   color?: string;
+  mask_last4?: string;
+  initial_balance?: number;
+}
+
+export interface UpdateAccountDTO {
+  id: string;
+  name: string;
+  type: AccountType;
+  currency?: string;
+  institution_name?: string;
+  logo_url?: string;
+  color?: string;
+  mask_last4?: string;
+  initial_balance?: number;
 }
 
 export interface CreateTransactionDTO {
