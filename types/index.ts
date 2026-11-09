@@ -1,49 +1,86 @@
 /**
  * Global TypeScript definitions for Hishobh (Expense Tracker)
+ * Phase 1: Accounts, Transactions, Timeframes, and Overview Metrics
  */
 
-export type TransactionType = "income" | "expense" | "transfer";
+export type AccountType =
+  | "bank"
+  | "cash"
+  | "credit_card"
+  | "savings"
+  | "lend_borrow";
 
-export interface UserProfile {
-  id: string; // Clerk User ID (sub)
-  email: string;
-  fullName?: string | null;
-  avatarUrl?: string | null;
-  preferredCurrency: string;
-  createdAt: string;
-  updatedAt: string;
-}
+export type TransactionType =
+  | "income"
+  | "expense"
+  | "transfer"
+  | "lend"
+  | "borrow";
 
-export interface Category {
+export type TimeframeOption =
+  | "weekly"
+  | "monthly"
+  | "quarterly"
+  | "6months"
+  | "yearly";
+
+export interface Account {
   id: string;
-  userId: string;
+  user_id: string;
   name: string;
-  type: TransactionType;
-  icon?: string;
-  color?: string;
-  isDefault?: boolean;
+  type: AccountType;
+  currency: string;
+  created_at: string;
+  // Computed / summary fields
+  balance?: number;
+  total_income?: number;
+  total_expense?: number;
 }
 
 export interface Transaction {
   id: string;
-  userId: string;
-  categoryId: string;
+  user_id: string;
+  account_id: string;
+  title: string;
   amount: number;
   type: TransactionType;
+  category?: string | null;
   date: string;
-  description?: string;
-  tags?: string[];
-  receiptUrl?: string;
-  createdAt: string;
-  updatedAt: string;
+  created_at: string;
+  account?: {
+    id?: string;
+    name: string;
+    type: AccountType;
+  } | null;
 }
 
-export interface Budget {
-  id: string;
-  userId: string;
-  categoryId?: string | null;
+export interface OverviewMetrics {
+  total_income: number;
+  total_expense: number;
+  balance: number;
+  income_percentage: number;
+  expense_percentage: number;
+}
+
+export interface DashboardData {
+  timeframe: TimeframeOption;
+  selectedAccountId: string; // "all" or specific UUID
+  metrics: OverviewMetrics;
+  accounts: Account[];
+  transactions: Transaction[];
+}
+
+export interface CreateAccountDTO {
+  name: string;
+  type: AccountType;
+  currency?: string;
+}
+
+export interface CreateTransactionDTO {
+  account_id: string;
+  title: string;
   amount: number;
-  period: "weekly" | "monthly" | "yearly";
-  startDate: string;
-  endDate?: string;
+  type: TransactionType;
+  category?: string;
+  date?: string;
 }
