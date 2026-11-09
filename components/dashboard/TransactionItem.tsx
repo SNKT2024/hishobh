@@ -5,8 +5,8 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  HandCoins,
   Repeat,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,8 +23,6 @@ export function TransactionItem({
 }: TransactionItemProps) {
   const isIncome = transaction.type === "income";
   const isExpense = transaction.type === "expense";
-  const isLendBorrow =
-    transaction.type === "lend" || transaction.type === "borrow";
 
   const getIcon = () => {
     if (isIncome) {
@@ -38,13 +36,6 @@ export function TransactionItem({
       return (
         <div className="h-9 w-9 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
           <ArrowUpRight className="h-4 w-4" />
-        </div>
-      );
-    }
-    if (isLendBorrow) {
-      return (
-        <div className="h-9 w-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
-          <HandCoins className="h-4 w-4" />
         </div>
       );
     }
@@ -69,13 +60,22 @@ export function TransactionItem({
 
   return (
     <div className="group flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-card border border-border/70 hover:border-border transition-all hover:shadow-sm">
-      {/* Left side: Icon + Title + Account subtext */}
+      {/* Left side: Icon + Title + Account & Person subtext */}
       <div className="flex items-center gap-3 min-w-0">
         {getIcon()}
         <div className="min-w-0">
-          <h4 className="font-semibold text-sm sm:text-base text-foreground truncate leading-snug">
-            {transaction.title}
-          </h4>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <h4 className="font-semibold text-sm sm:text-base text-foreground truncate leading-snug">
+              {transaction.title}
+            </h4>
+            {transaction.person && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-secondary/90 text-[10px] font-medium text-secondary-foreground border border-border/50 shrink-0">
+                <User className="h-2.5 w-2.5 text-primary" />
+                {transaction.person.name}
+              </span>
+            )}
+          </div>
+
           <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground truncate">
             <span>{transaction.account?.name || "Standard Account"}</span>
             {transaction.category && (

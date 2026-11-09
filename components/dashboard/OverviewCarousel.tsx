@@ -7,13 +7,13 @@ import { formatCurrency } from "@/lib/utils";
 import {
   ArrowDownLeft,
   ArrowUpRight,
+  Banknote,
   Building2,
   ChevronLeft,
   ChevronRight,
   CreditCard,
   Globe,
-  HandCoins,
-  Wallet,
+  WalletCards,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +41,9 @@ export function OverviewCarousel({
       id: "all",
       name: "All Accounts",
       type: "overview",
-      subtext: "Excludes Lend / Borrow",
+      institution: "Combined Ledger",
+      subtext: "Global Overview",
+      color: null,
       income: metrics.total_income,
       expense: metrics.total_expense,
       balance: metrics.balance,
@@ -50,7 +52,9 @@ export function OverviewCarousel({
       id: acc.id,
       name: acc.name,
       type: acc.type,
-      subtext: acc.type.replace("_", " ").toUpperCase(),
+      institution: acc.institution_name || acc.name,
+      subtext: acc.type.toUpperCase(),
+      color: acc.color,
       income: acc.total_income || 0,
       expense: acc.total_expense || 0,
       balance: (acc.total_income || 0) - (acc.total_expense || 0),
@@ -108,12 +112,12 @@ export function OverviewCarousel({
     switch (type) {
       case "bank":
         return <Building2 className="h-4 w-4" />;
-      case "credit_card":
+      case "card":
         return <CreditCard className="h-4 w-4" />;
+      case "wallet":
+        return <WalletCards className="h-4 w-4" />;
       case "cash":
-        return <Wallet className="h-4 w-4" />;
-      case "lend_borrow":
-        return <HandCoins className="h-4 w-4" />;
+        return <Banknote className="h-4 w-4" />;
       default:
         return <Globe className="h-4 w-4" />;
     }
@@ -172,24 +176,41 @@ export function OverviewCarousel({
                 onSelectAccount(slide.id);
               }}
               className={cn(
-                "snap-center shrink-0 w-[90vw] sm:w-[380px] md:w-[420px] rounded-3xl p-5 sm:p-6 transition-all duration-300 cursor-pointer border shadow-sm",
+                "snap-center shrink-0 w-[90vw] sm:w-[380px] md:w-[420px] rounded-3xl p-5 sm:p-6 transition-all duration-300 cursor-pointer border shadow-sm relative overflow-hidden",
                 isSelected
                   ? "bg-gradient-to-b from-card via-card to-card/90 border-primary/40 shadow-md ring-1 ring-primary/20"
                   : "bg-card/60 border-border/70 opacity-70 hover:opacity-90"
               )}
             >
+              {/* Optional brand accent line */}
+              {slide.color && (
+                <div
+                  className="absolute top-0 left-0 right-0 h-1"
+                  style={{ backgroundColor: slide.color }}
+                />
+              )}
+
               {/* Card Header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <div
+                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0"
+                    style={
+                      slide.color
+                        ? { backgroundColor: `${slide.color}20`, color: slide.color }
+                        : undefined
+                    }
+                  >
                     {getAccountIcon(slide.type)}
                   </div>
                   <div>
                     <h3 className="font-semibold text-foreground text-sm sm:text-base leading-tight">
                       {slide.name}
                     </h3>
-                    <p className="text-[11px] text-muted-foreground">
-                      {slide.subtext}
+                    <p className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <span>{slide.institution}</span>
+                      <span>&bull;</span>
+                      <span className="font-medium">{slide.subtext}</span>
                     </p>
                   </div>
                 </div>
@@ -271,7 +292,9 @@ export function OverviewCarousel({
             }}
             className={cn(
               "h-1.5 rounded-full transition-all duration-300",
-              activeIndex === i ? "w-6 bg-primary" : "w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/60"
+              activeIndex === i
+                ? "w-6 bg-primary"
+                : "w-1.5 bg-muted-foreground/30 hover:bg-muted-foreground/60"
             )}
             aria-label={`Slide ${i + 1}`}
           />

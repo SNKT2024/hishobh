@@ -9,18 +9,23 @@ import {
   CreateTransactionDTO,
   DashboardData,
   OverviewMetrics,
+  Person,
   TimeframeOption,
   Transaction,
 } from "@/types";
 import { revalidatePath } from "next/cache";
+import { getPeopleAction } from "./people";
 
-// Initial demo fallback accounts if database is empty or during local onboarding
+// Demo fallback accounts reflecting strict types (cash, bank, wallet, card) and branding
 const DEMO_ACCOUNTS: Account[] = [
   {
-    id: "acc-checking-1",
+    id: "acc-bank-1",
     user_id: "demo-user",
-    name: "Main Checking",
+    name: "Chase Checking",
     type: "bank",
+    institution_name: "Chase",
+    logo_url: "/logos/chase.svg",
+    color: "#1170cf",
     currency: "USD",
     created_at: new Date().toISOString(),
   },
@@ -29,22 +34,31 @@ const DEMO_ACCOUNTS: Account[] = [
     user_id: "demo-user",
     name: "Cash Wallet",
     type: "cash",
+    institution_name: "Physical Cash",
+    logo_url: null,
+    color: "#10b981",
     currency: "USD",
     created_at: new Date().toISOString(),
   },
   {
     id: "acc-card-3",
     user_id: "demo-user",
-    name: "Credit Card",
-    type: "credit_card",
+    name: "Apple Card",
+    type: "card",
+    institution_name: "Apple / Goldman",
+    logo_url: "/logos/apple.svg",
+    color: "#ffffff",
     currency: "USD",
     created_at: new Date().toISOString(),
   },
   {
-    id: "acc-lend-4",
+    id: "acc-wallet-4",
     user_id: "demo-user",
-    name: "Friend Loan",
-    type: "lend_borrow",
+    name: "PayPal Balance",
+    type: "wallet",
+    institution_name: "PayPal",
+    logo_url: "/logos/paypal.svg",
+    color: "#003087",
     currency: "USD",
     created_at: new Date().toISOString(),
   },
@@ -54,68 +68,59 @@ const DEMO_TRANSACTIONS: Transaction[] = [
   {
     id: "tx-1",
     user_id: "demo-user",
-    account_id: "acc-checking-1",
+    account_id: "acc-bank-1",
+    person_id: null,
     title: "Monthly Salary",
     amount: 2350.0,
     type: "income",
     category: "Salary",
     date: new Date().toISOString(),
     created_at: new Date().toISOString(),
-    account: { name: "Main Checking", type: "bank" },
+    account: { name: "Chase Checking", type: "bank", institution_name: "Chase" },
   },
   {
     id: "tx-2",
     user_id: "demo-user",
-    account_id: "acc-checking-1",
-    title: "Grocery Store",
+    account_id: "acc-bank-1",
+    person_id: "p-1",
+    title: "Grocery Split",
     amount: 450.0,
     type: "expense",
     category: "Groceries",
     date: new Date(Date.now() - 86400000 * 1).toISOString(),
     created_at: new Date(Date.now() - 86400000 * 1).toISOString(),
-    account: { name: "Main Checking", type: "bank" },
+    account: { name: "Chase Checking", type: "bank", institution_name: "Chase" },
+    person: { id: "p-1", name: "Alex Johnson", relationship: "Friend" },
   },
   {
     id: "tx-3",
     user_id: "demo-user",
     account_id: "acc-card-3",
+    person_id: null,
     title: "Electric & Water Bill",
     amount: 280.0,
     type: "expense",
     category: "Utilities",
     date: new Date(Date.now() - 86400000 * 2).toISOString(),
     created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-    account: { name: "Credit Card", type: "credit_card" },
+    account: { name: "Apple Card", type: "card", institution_name: "Apple / Goldman" },
   },
   {
     id: "tx-4",
     user_id: "demo-user",
     account_id: "acc-cash-2",
-    title: "Dining Out",
+    person_id: "p-2",
+    title: "Dinner with Sarah",
     amount: 220.0,
     type: "expense",
     category: "Food",
     date: new Date(Date.now() - 86400000 * 3).toISOString(),
     created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-    account: { name: "Cash Wallet", type: "cash" },
-  },
-  {
-    id: "tx-5",
-    user_id: "demo-user",
-    account_id: "acc-lend-4",
-    title: "Lent to Alex",
-    amount: 300.0,
-    type: "lend",
-    category: "Lend",
-    date: new Date(Date.now() - 86400000 * 4).toISOString(),
-    created_at: new Date(Date.now() - 86400000 * 4).toISOString(),
-    account: { name: "Friend Loan", type: "lend_borrow" },
+    account: { name: "Cash Wallet", type: "cash", institution_name: "Physical Cash" },
+    person: { id: "p-2", name: "Sarah Miller", relationship: "Family" },
   },
 ];
 
-/**
- * Checks if Supabase credentials are valid live credentials
- */
 function isSupabaseConfigured(): boolean {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -127,34 +132,17 @@ function isSupabaseConfigured(): boolean {
   );
 }
 
-/**
- * Calculate Overview Metrics (Totals & Percentages) according to the Phase 1 rules:
- * - When account is "all", exclude transactions from lend_borrow accounts and lend/borrow types.
- */
 function calculateMetrics(
   transactions: Transaction[],
-  selectedAccountId: string,
-  accountMap: Map<string, Account>
+  selectedAccountId: string
 ): OverviewMetrics {
   let totalIncome = 0;
   let totalExpense = 0;
 
   for (const t of transactions) {
-    const acc = accountMap.get(t.account_id);
-    const isLendBorrow =
-      acc?.type === "lend_borrow" || t.type === "lend" || t.type === "borrow";
-
-    if (selectedAccountId === "all") {
-      // RULE: strictly exclude lend/borrow accounts and transactions from global overview
-      if (isLendBorrow) continue;
+    if (selectedAccountId === "all" || t.account_id === selectedAccountId) {
       if (t.type === "income") totalIncome += Number(t.amount);
       if (t.type === "expense") totalExpense += Number(t.amount);
-    } else {
-      // Account specific filter
-      if (t.account_id === selectedAccountId) {
-        if (t.type === "income") totalIncome += Number(t.amount);
-        if (t.type === "expense") totalExpense += Number(t.amount);
-      }
     }
   }
 
@@ -173,7 +161,7 @@ function calculateMetrics(
 }
 
 /**
- * Fetches dashboard data: accounts, transactions, and calculated metrics
+ * Fetches dashboard data: accounts, transactions, people, and calculated metrics
  */
 export async function getDashboardData(
   timeframe: TimeframeOption = "monthly",
@@ -181,18 +169,15 @@ export async function getDashboardData(
 ): Promise<DashboardData> {
   const { userId } = await auth();
   const { startDate, endDate } = getTimeframeRange(timeframe);
+  const people = await getPeopleAction();
 
   if (!isSupabaseConfigured() || !userId) {
-    // Return structured demo data
-    const accountMap = new Map(DEMO_ACCOUNTS.map((a) => [a.id, a]));
-
     // Filter transactions by timeframe
     const filteredByDate = DEMO_TRANSACTIONS.filter((t) => {
       const d = new Date(t.date);
       return d >= startDate && d <= endDate;
     });
 
-    // Populate per-account income/expense summaries
     const accountsWithMetrics = DEMO_ACCOUNTS.map((acc) => {
       const accTxs = filteredByDate.filter((t) => t.account_id === acc.id);
       const inc = accTxs
@@ -209,17 +194,12 @@ export async function getDashboardData(
       };
     });
 
-    // Filter transactions for list view
     const visibleTransactions =
       selectedAccountId === "all"
         ? filteredByDate
         : filteredByDate.filter((t) => t.account_id === selectedAccountId);
 
-    const metrics = calculateMetrics(
-      filteredByDate,
-      selectedAccountId,
-      accountMap
-    );
+    const metrics = calculateMetrics(filteredByDate, selectedAccountId);
 
     return {
       timeframe,
@@ -227,6 +207,7 @@ export async function getDashboardData(
       metrics,
       accounts: accountsWithMetrics,
       transactions: visibleTransactions,
+      people,
     };
   }
 
@@ -244,12 +225,33 @@ export async function getDashboardData(
       console.error("Error fetching accounts:", accError);
     }
 
-    // Auto-seed default accounts if user has none
+    // Auto-seed default accounts with new types if user has none
     if (!accountsData || accountsData.length === 0) {
       const defaultAccounts = [
-        { user_id: userId, name: "Main Checking", type: "bank", currency: "USD" },
-        { user_id: userId, name: "Cash Wallet", type: "cash", currency: "USD" },
-        { user_id: userId, name: "Credit Card", type: "credit_card", currency: "USD" },
+        {
+          user_id: userId,
+          name: "Main Checking",
+          type: "bank",
+          institution_name: "Primary Bank",
+          color: "#2563eb",
+          currency: "USD",
+        },
+        {
+          user_id: userId,
+          name: "Cash Wallet",
+          type: "cash",
+          institution_name: "Physical Cash",
+          color: "#10b981",
+          currency: "USD",
+        },
+        {
+          user_id: userId,
+          name: "Credit Card",
+          type: "card",
+          institution_name: "Card Issuer",
+          color: "#8b5cf6",
+          currency: "USD",
+        },
       ];
       const { data: seeded, error: seedError } = await supabase
         .from("accounts")
@@ -266,12 +268,10 @@ export async function getDashboardData(
       currency: a.currency || "USD",
     }));
 
-    const accountMap = new Map(accounts.map((a) => [a.id, a]));
-
-    // 2. Fetch transactions in timeframe
+    // 2. Fetch transactions in timeframe with account and person relations
     const { data: txData, error: txError } = await supabase
       .from("transactions")
-      .select("*, account:accounts(id, name, type)")
+      .select("*, account:accounts(id, name, type, institution_name), person:people(id, name, relationship)")
       .gte("date", startDate.toISOString())
       .lte("date", endDate.toISOString())
       .order("date", { ascending: false });
@@ -303,7 +303,7 @@ export async function getDashboardData(
     });
 
     // 4. Compute global/selected metrics
-    const metrics = calculateMetrics(transactions, selectedAccountId, accountMap);
+    const metrics = calculateMetrics(transactions, selectedAccountId);
 
     // 5. Filter transactions for the recent list
     const visibleTransactions =
@@ -317,10 +317,10 @@ export async function getDashboardData(
       metrics,
       accounts: accountsWithMetrics,
       transactions: visibleTransactions,
+      people,
     };
   } catch (err) {
     console.error("Dashboard data fetch exception:", err);
-    // Return graceful fallback
     return {
       timeframe,
       selectedAccountId,
@@ -333,6 +333,7 @@ export async function getDashboardData(
       },
       accounts: [],
       transactions: [],
+      people: [],
     };
   }
 }
@@ -347,7 +348,6 @@ export async function createTransactionAction(dto: CreateTransactionDTO) {
   }
 
   if (!isSupabaseConfigured()) {
-    // In demo mode without live DB, acknowledge success
     revalidatePath("/dashboard");
     return { success: true, message: "Transaction recorded in demo mode." };
   }
@@ -358,6 +358,7 @@ export async function createTransactionAction(dto: CreateTransactionDTO) {
     .insert({
       user_id: userId,
       account_id: dto.account_id,
+      person_id: dto.person_id || null,
       title: dto.title,
       amount: dto.amount,
       type: dto.type,
@@ -397,6 +398,9 @@ export async function createAccountAction(dto: CreateAccountDTO) {
       user_id: userId,
       name: dto.name,
       type: dto.type,
+      institution_name: dto.institution_name || null,
+      logo_url: dto.logo_url || null,
+      color: dto.color || null,
       currency: dto.currency || "USD",
     })
     .select()

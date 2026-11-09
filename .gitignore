@@ -37,3 +37,6 @@ next-env.d.ts
 # Serwist / Service Worker
 public/sw*
 public/swe-worker*
+
+# clerk configuration (can include secrets)
+/.clerk/

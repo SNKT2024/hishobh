@@ -8,14 +8,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Account, CreateTransactionDTO, TransactionType } from "@/types";
-import { ArrowDownLeft, ArrowUpRight, DollarSign, Loader2 } from "lucide-react";
+import { Account, CreateTransactionDTO, Person, TransactionType } from "@/types";
+import { ArrowDownLeft, ArrowUpRight, DollarSign, Loader2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AddTransactionModalProps {
   isOpen: boolean;
   onClose: () => void;
   accounts: Account[];
+  people?: Person[];
   onAddTransaction: (dto: CreateTransactionDTO) => Promise<void>;
 }
 
@@ -23,12 +24,14 @@ export function AddTransactionModal({
   isOpen,
   onClose,
   accounts,
+  people = [],
   onAddTransaction,
 }: AddTransactionModalProps) {
   const [type, setType] = useState<TransactionType>("expense");
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [accountId, setAccountId] = useState(accounts[0]?.id || "");
+  const [personId, setPersonId] = useState<string>("");
   const [category, setCategory] = useState("General");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +61,7 @@ export function AddTransactionModal({
       setIsSubmitting(true);
       await onAddTransaction({
         account_id: targetAccount,
+        person_id: personId ? personId : null,
         title: title.trim(),
         amount: parsedAmount,
         type,
@@ -68,6 +72,7 @@ export function AddTransactionModal({
       // Reset & close
       setTitle("");
       setAmount("");
+      setPersonId("");
       onClose();
     } catch (err: any) {
       setError(err?.message || "Failed to add transaction");
@@ -78,7 +83,7 @@ export function AddTransactionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">New Transaction</DialogTitle>
         </DialogHeader>
@@ -163,7 +168,37 @@ export function AddTransactionModal({
             >
               {accounts.map((acc) => (
                 <option key={acc.id} value={acc.id}>
-                  {acc.name} ({acc.type})
+                  {acc.name} ({acc.institution_name || acc.type.toUpperCase()})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Optional Counterparty / Person Tag */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <User className="h-3.5 w-3.5 text-primary" />
+                With Person (Optional Tag)
+              </label>
+              {people.length === 0 && (
+                <a
+                  href="/settings/people"
+                  className="text-[11px] text-primary hover:underline font-medium"
+                >
+                  + Add people in Settings
+                </a>
+              )}
+            </div>
+            <select
+              value={personId}
+              onChange={(e) => setPersonId(e.target.value)}
+              className="w-full px-3.5 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">None (Personal transaction)</option>
+              {people.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} {p.relationship ? `(${p.relationship})` : ""}
                 </option>
               ))}
             </select>

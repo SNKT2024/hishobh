@@ -134,6 +134,7 @@ export function DashboardClient({
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         accounts={data.accounts}
+        people={data.people || []}
         onAddTransaction={handleAddTransaction}
       />
     </div>

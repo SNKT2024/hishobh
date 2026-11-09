@@ -1,21 +1,14 @@
 /**
  * Global TypeScript definitions for Hishobh (Expense Tracker)
- * Phase 1: Accounts, Transactions, Timeframes, and Overview Metrics
+ * Architecture:
+ * - Strict Account Types: cash, bank, wallet, card with institution branding
+ * - Centralized People entity
+ * - Isolated Debts ledger (Lend & Borrow)
  */
 
-export type AccountType =
-  | "bank"
-  | "cash"
-  | "credit_card"
-  | "savings"
-  | "lend_borrow";
+export type AccountType = "cash" | "bank" | "wallet" | "card";
 
-export type TransactionType =
-  | "income"
-  | "expense"
-  | "transfer"
-  | "lend"
-  | "borrow";
+export type TransactionType = "income" | "expense" | "transfer";
 
 export type TimeframeOption =
   | "weekly"
@@ -30,6 +23,9 @@ export interface Account {
   name: string;
   type: AccountType;
   currency: string;
+  institution_name?: string | null;
+  logo_url?: string | null;
+  color?: string | null;
   created_at: string;
   // Computed / summary fields
   balance?: number;
@@ -37,10 +33,20 @@ export interface Account {
   total_expense?: number;
 }
 
+export interface Person {
+  id: string;
+  user_id: string;
+  name: string;
+  relationship?: string | null; // "Friend" | "Family" | "Colleague" | "Partner" | "Work" | "Other"
+  avatar_url?: string | null;
+  created_at: string;
+}
+
 export interface Transaction {
   id: string;
   user_id: string;
   account_id: string;
+  person_id?: string | null;
   title: string;
   amount: number;
   type: TransactionType;
@@ -51,7 +57,38 @@ export interface Transaction {
     id?: string;
     name: string;
     type: AccountType;
+    institution_name?: string | null;
   } | null;
+  person?: {
+    id: string;
+    name: string;
+    relationship?: string | null;
+  } | null;
+}
+
+export type DebtType = "lend" | "borrow";
+export type DebtStatus = "pending" | "partially_settled" | "settled";
+
+export interface Debt {
+  id: string;
+  user_id: string;
+  person_id: string;
+  type: DebtType;
+  total_amount: number;
+  settled_amount: number;
+  due_date?: string | null;
+  status: DebtStatus;
+  description?: string | null;
+  created_at: string;
+  person?: Person | null;
+}
+
+export interface DebtSettlement {
+  id: string;
+  debt_id: string;
+  amount: number;
+  settlement_date: string;
+  notes?: string | null;
 }
 
 export interface OverviewMetrics {
@@ -68,19 +105,45 @@ export interface DashboardData {
   metrics: OverviewMetrics;
   accounts: Account[];
   transactions: Transaction[];
+  people: Person[];
 }
 
 export interface CreateAccountDTO {
   name: string;
   type: AccountType;
   currency?: string;
+  institution_name?: string;
+  logo_url?: string;
+  color?: string;
 }
 
 export interface CreateTransactionDTO {
   account_id: string;
+  person_id?: string | null;
   title: string;
   amount: number;
   type: TransactionType;
   category?: string;
   date?: string;
+}
+
+export interface CreatePersonDTO {
+  name: string;
+  relationship?: string;
+  avatar_url?: string;
+}
+
+export interface UpdatePersonDTO {
+  id: string;
+  name: string;
+  relationship?: string;
+  avatar_url?: string;
+}
+
+export interface CreateDebtDTO {
+  person_id: string;
+  type: DebtType;
+  total_amount: number;
+  due_date?: string;
+  description?: string;
 }

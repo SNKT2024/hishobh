@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
   Home,
@@ -16,17 +17,39 @@ interface BottomNavProps {
 }
 
 export function BottomNav({
-  activeTab = "home",
+  activeTab: controlledActiveTab,
   onTabChange,
   onOpenAddModal,
 }: BottomNavProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const getActiveTab = () => {
+    if (controlledActiveTab) return controlledActiveTab;
+    if (pathname?.startsWith("/settings")) return "settings";
+    if (pathname?.startsWith("/accounts")) return "accounts";
+    if (pathname?.startsWith("/stats")) return "stats";
+    return "home";
+  };
+
+  const currentTab = getActiveTab();
+
   const tabs = [
-    { id: "home", label: "Home", icon: Home },
-    { id: "stats", label: "Stats", icon: BarChart3 },
+    { id: "home", label: "Home", icon: Home, href: "/dashboard" },
+    { id: "stats", label: "Stats", icon: BarChart3, href: "/dashboard" },
     { id: "add", label: "Add", icon: Plus, isAction: true },
-    { id: "accounts", label: "Accounts", icon: WalletCards },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "accounts", label: "Accounts", icon: WalletCards, href: "/dashboard" },
+    { id: "settings", label: "Settings", icon: Settings, href: "/settings" },
   ];
+
+  const handleTabClick = (tab: (typeof tabs)[number]) => {
+    if (onTabChange) {
+      onTabChange(tab.id);
+    }
+    if (tab.href) {
+      router.push(tab.href);
+    }
+  };
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none pb-safe">
@@ -34,7 +57,7 @@ export function BottomNav({
         <nav className="pointer-events-auto relative flex items-center justify-around h-16 rounded-2xl sm:rounded-3xl bg-background/95 backdrop-blur-md border border-border/80 shadow-lg px-2 sm:px-4">
           {tabs.map((tab) => {
             const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
+            const isActive = currentTab === tab.id;
 
             if (tab.isAction) {
               return (
@@ -56,7 +79,7 @@ export function BottomNav({
             return (
               <button
                 key={tab.id}
-                onClick={() => onTabChange?.(tab.id)}
+                onClick={() => handleTabClick(tab)}
                 className={cn(
                   "flex flex-col items-center justify-center flex-1 h-full py-1 text-xs font-medium transition-colors select-none",
                   isActive
