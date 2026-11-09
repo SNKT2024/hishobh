@@ -8,10 +8,23 @@ import {
   Users,
 } from "lucide-react";
 
+interface SettingsItem {
+  title: string;
+  description: string;
+  icon: any;
+  href: string;
+  badge?: string;
+}
+
+interface SettingsSection {
+  title: string;
+  items: SettingsItem[];
+}
+
 export default async function SettingsPage() {
   const user = await currentUser();
 
-  const settingsSections = [
+  const settingsSections: SettingsSection[] = [
     {
       title: "Entities & Counterparties",
       items: [
@@ -26,14 +39,15 @@ export default async function SettingsPage() {
           title: "Accounts & Cards",
           description: "Configure Cash, Bank accounts, Wallets, and Credit Cards",
           icon: CreditCard,
-          href: "/dashboard",
+          href: "/accounts",
+          badge: "Active",
         },
         {
           title: "Lend & Borrow Ledger",
           description: "Isolated debts and settlement history",
           icon: HandCoins,
-          href: "/dashboard",
-          badge: "Phase 3",
+          href: "/settings/lend-borrow",
+          badge: "Active",
         },
       ],
     },

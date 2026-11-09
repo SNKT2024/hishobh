@@ -83,6 +83,7 @@ export interface Debt {
   description?: string | null;
   created_at: string;
   person?: Person | null;
+  settlements?: DebtSettlement[];
 }
 
 export interface DebtSettlement {
@@ -91,6 +92,22 @@ export interface DebtSettlement {
   amount: number;
   settlement_date: string;
   notes?: string | null;
+}
+
+export interface CreateDebtSettlementDTO {
+  debt_id: string;
+  amount: number;
+  settlement_date?: string;
+  notes?: string;
+}
+
+export interface DebtSummaryMetrics {
+  total_lent: number;
+  total_borrowed: number;
+  total_lent_recovered: number;
+  recovery_percentage: number;
+  active_lend_count: number;
+  active_borrow_count: number;
 }
 
 export interface OverviewMetrics {
