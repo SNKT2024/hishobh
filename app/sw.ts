@@ -2,7 +2,7 @@
 
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist } from "serwist";
+import { NetworkOnly, Serwist } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -17,7 +17,21 @@ const serwist = new Serwist({
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  runtimeCaching: [
+    {
+      // Always bypass service worker cache for auth routes, RSC payload queries, and API
+      matcher: ({ url }) => {
+        return (
+          url.pathname.startsWith("/sign-in") ||
+          url.pathname.startsWith("/sign-up") ||
+          url.pathname.startsWith("/api") ||
+          url.searchParams.has("_rsc")
+        );
+      },
+      handler: new NetworkOnly(),
+    },
+    ...defaultCache,
+  ],
 });
 
 serwist.addEventListeners();

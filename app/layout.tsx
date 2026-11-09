@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ServiceWorkerManager } from "@/components/shared/ServiceWorkerManager";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -39,8 +40,12 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider dynamic>
-      <html lang="en">
-        <body className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary">
+      <html lang="en" suppressHydrationWarning>
+        <body
+          className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary"
+          suppressHydrationWarning
+        >
+          <ServiceWorkerManager />
           {children}
         </body>
       </html>
