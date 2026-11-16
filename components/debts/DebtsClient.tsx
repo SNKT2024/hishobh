@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   CreateDebtDTO,
   CreateDebtSettlementDTO,
@@ -42,7 +43,7 @@ export function DebtsClient({
   initialDebts,
   initialMetrics,
   people: initialPeople,
-  currency = "USD",
+  currency = "INR",
 }: DebtsClientProps) {
   const [debts, setDebts] = useState<Debt[]>(initialDebts);
   const [metrics, setMetrics] = useState<DebtSummaryMetrics>(initialMetrics);
@@ -107,35 +108,41 @@ export function DebtsClient({
   };
 
   return (
-    <div className="w-full flex flex-col space-y-6 pb-24 pt-2">
+    <div
+      className="w-full flex flex-col space-y-6 pb-24 sm:pb-28 pt-2"
+      suppressHydrationWarning
+    >
       {/* Top Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <a
+      <div className="flex flex-col gap-2" suppressHydrationWarning>
+        <div className="flex items-center justify-between">
+          <Link
             href="/settings"
-            className="p-2 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            prefetch={true}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground py-1.5 px-2 -ml-2 rounded-xl hover:bg-secondary transition-colors"
             aria-label="Back to Settings"
           >
-            <ArrowLeft className="h-5 w-5" />
-          </a>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-              Lend & Borrow Ledger
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Isolated counterparty registry for tracking loans, IOUs, and repayments
-            </p>
-          </div>
+            <ArrowLeft className="h-4 w-4" />
+            <span>Settings</span>
+          </Link>
+
+          <Button
+            onClick={() => setIsAddModalOpen(true)}
+            size="sm"
+            className="gap-1.5 shadow-sm text-xs font-semibold rounded-xl h-9 px-3.5"
+          >
+            <Plus className="h-4 w-4" />
+            <span>New Record</span>
+          </Button>
         </div>
 
-        <Button
-          onClick={() => setIsAddModalOpen(true)}
-          size="sm"
-          className="gap-1.5 shadow-sm text-xs font-semibold rounded-xl"
-        >
-          <Plus className="h-4 w-4" />
-          New Record
-        </Button>
+        <div className="space-y-0.5">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+            Lend & Borrow Ledger
+          </h1>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Isolated counterparty registry for tracking loans, IOUs, and repayments
+          </p>
+        </div>
       </div>
 
       {/* Top Summary Stat Cards */}
@@ -146,7 +153,7 @@ export function DebtsClient({
             <span className="text-xs font-semibold uppercase tracking-wider">
               Total Lent (To Collect)
             </span>
-            <div className="h-7 w-7 rounded-lg bg-violet-600/10 text-violet-600 dark:text-violet-400 flex items-center justify-center">
+            <div className="h-7 w-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
               <ArrowUpRight className="h-4 w-4" />
             </div>
           </div>
@@ -186,7 +193,7 @@ export function DebtsClient({
               <Percent className="h-4 w-4" />
             </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-emerald-500 tracking-tight">
+          <div className="text-xl sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
             {formatCurrency(metrics.total_lent_recovered, currency)}
           </div>
           <span className="text-[11px] text-muted-foreground mt-0.5 block">
@@ -200,27 +207,29 @@ export function DebtsClient({
         <button
           onClick={() => setActiveTab("lend")}
           className={cn(
-            "flex items-center justify-center gap-2 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all",
+            "flex items-center justify-center gap-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all text-center",
             activeTab === "lend"
               ? "bg-card text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
-          <ArrowUpRight className="h-4 w-4 text-violet-500" />
-          Lent to Others (Receivable)
+          <ArrowUpRight className="h-4 w-4 text-violet-500 shrink-0" />
+          <span className="hidden sm:inline">Lent to Others (Receivable)</span>
+          <span className="sm:hidden">I Lent (Collect)</span>
         </button>
 
         <button
           onClick={() => setActiveTab("borrow")}
           className={cn(
-            "flex items-center justify-center gap-2 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all",
+            "flex items-center justify-center gap-1.5 py-2.5 text-xs sm:text-sm font-bold rounded-xl transition-all text-center",
             activeTab === "borrow"
               ? "bg-card text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
-          <ArrowDownLeft className="h-4 w-4 text-amber-500" />
-          Borrowed by Me (Payable)
+          <ArrowDownLeft className="h-4 w-4 text-amber-500 shrink-0" />
+          <span className="hidden sm:inline">Borrowed by Me (Payable)</span>
+          <span className="sm:hidden">I Borrowed (Pay)</span>
         </button>
       </div>
 
@@ -296,6 +305,9 @@ export function DebtsClient({
             </Button>
           </div>
         )}
+
+        {/* Guaranteed bottom clearance spacer so records never clip behind BottomNav */}
+        <div className="h-24 sm:h-28 shrink-0 pointer-events-none" aria-hidden="true" />
       </div>
 
       {/* Modals */}

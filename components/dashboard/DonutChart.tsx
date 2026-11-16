@@ -14,7 +14,7 @@ interface DonutChartProps {
 export function DonutChart({
   income,
   expense,
-  currency = "USD",
+  currency = "INR",
   size = 180,
   strokeWidth = 22,
 }: DonutChartProps) {
@@ -64,17 +64,6 @@ export function DonutChart({
         viewBox={`0 0 ${size} ${size}`}
         className="transform -rotate-90"
       >
-        <defs>
-          <linearGradient id="incomeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#10b981" />
-            <stop offset="100%" stopColor="#059669" />
-          </linearGradient>
-          <linearGradient id="expenseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#f43f5e" />
-            <stop offset="100%" stopColor="#e11d48" />
-          </linearGradient>
-        </defs>
-
         {/* Background track circle */}
         <circle
           cx={center}
@@ -95,7 +84,7 @@ export function DonutChart({
                 cy={center}
                 r={radius}
                 fill="none"
-                stroke="url(#incomeGrad)"
+                stroke="#10b981"
                 strokeWidth={strokeWidth}
                 strokeDasharray={`${(circumference * income) / total} ${circumference}`}
                 strokeDashoffset={0}
@@ -111,7 +100,7 @@ export function DonutChart({
                 cy={center}
                 r={radius}
                 fill="none"
-                stroke="url(#expenseGrad)"
+                stroke="#f43f5e"
                 strokeWidth={strokeWidth}
                 strokeDasharray={`${(circumference * expense) / total} ${circumference}`}
                 strokeDashoffset={-((circumference * income) / total)}

@@ -9,7 +9,7 @@ export default async function DashboardPage() {
   const initialData = await getDashboardData("monthly", "all");
 
   return (
-    <div className="max-w-md sm:max-w-xl md:max-w-2xl mx-auto w-full">
+    <div className="max-w-md sm:max-w-xl md:max-w-2xl mx-auto w-full h-full flex-1 min-h-0 flex flex-col overflow-hidden">
       <DashboardClient
         initialData={initialData}
         userName={user?.firstName || user?.username || "there"}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { CreatePersonDTO, Person } from "@/types";
 import { PersonModal } from "./PersonModal";
 import { Button } from "@/components/ui/button";
@@ -99,38 +100,44 @@ export function PeopleClient({ initialPeople }: PeopleClientProps) {
   };
 
   return (
-    <div className="w-full flex flex-col space-y-5 pb-20 pt-2">
+    <div
+      className="w-full flex flex-col space-y-5 pb-24 sm:pb-28 pt-2"
+      suppressHydrationWarning
+    >
       {/* Top Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <a
+      <div className="flex flex-col gap-2" suppressHydrationWarning>
+        <div className="flex items-center justify-between">
+          <Link
             href="/settings"
-            className="p-2 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+            prefetch={true}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground py-1.5 px-2 -ml-2 rounded-xl hover:bg-secondary transition-colors"
             aria-label="Back to Settings"
           >
-            <ArrowLeft className="h-5 w-5" />
-          </a>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-              People & Counterparties
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              Manage contacts for split transactions, lending, and borrowing
-            </p>
-          </div>
+            <ArrowLeft className="h-4 w-4" />
+            <span>Settings</span>
+          </Link>
+
+          <Button
+            onClick={() => {
+              setPersonToEdit(null);
+              setIsModalOpen(true);
+            }}
+            size="sm"
+            className="gap-1.5 shadow-sm text-xs font-semibold rounded-xl h-9 px-3.5"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Person</span>
+          </Button>
         </div>
 
-        <Button
-          onClick={() => {
-            setPersonToEdit(null);
-            setIsModalOpen(true);
-          }}
-          size="sm"
-          className="gap-1.5 shadow-sm text-xs font-semibold rounded-xl"
-        >
-          <Plus className="h-4 w-4" />
-          Add Person
-        </Button>
+        <div className="space-y-0.5">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+            People & Counterparties
+          </h1>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Manage contacts for split transactions, lending, and borrowing
+          </p>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -165,7 +172,7 @@ export function PeopleClient({ initialPeople }: PeopleClientProps) {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {/* Initials Avatar */}
-                    <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-bold flex items-center justify-center shrink-0 shadow-sm text-sm">
+                    <div className="h-11 w-11 rounded-2xl bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0 border border-border shadow-xs text-sm">
                       {getInitials(person.name)}
                     </div>
 
@@ -236,6 +243,9 @@ export function PeopleClient({ initialPeople }: PeopleClientProps) {
             </Button>
           </div>
         )}
+
+        {/* Guaranteed bottom clearance spacer so contacts never clip behind BottomNav */}
+        <div className="h-24 sm:h-28 shrink-0 pointer-events-none" aria-hidden="true" />
       </div>
 
       {/* Add / Edit Dialog */}

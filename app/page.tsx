@@ -1,11 +1,22 @@
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { SharedHeader } from "@/components/shared/header";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Smartphone, ShieldCheck, Zap } from "lucide-react";
+import { RedirectIfAuthenticated } from "@/components/auth/RedirectIfAuthenticated";
 
-export default function HomePage() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const { userId } = await auth();
+  if (userId) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
+      <RedirectIfAuthenticated />
       <SharedHeader />
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center max-w-4xl mx-auto">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary mb-6">
@@ -14,7 +25,7 @@ export default function HomePage() {
 
         <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-foreground max-w-2xl mb-4">
           Master your personal expenses with{" "}
-          <span className="bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+          <span className="text-primary font-black">
             Hishobh
           </span>
         </h1>

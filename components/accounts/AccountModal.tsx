@@ -17,9 +17,10 @@ import { BrandLogo } from "./BrandLogo";
 import {
   Banknote,
   Building2,
+  Calendar,
   Check,
   CreditCard,
-  DollarSign,
+  IndianRupee,
   Loader2,
   WalletCards,
 } from "lucide-react";
@@ -33,15 +34,15 @@ interface AccountModalProps {
 }
 
 const COLOR_SWATCHES = [
+  { label: "Lavender Purple", hex: "#7E30E1" },
+  { label: "Orchid Pink", hex: "#E26EE5" },
+  { label: "Royal Purple", hex: "#49108B" },
   { label: "Chase Blue", hex: "#1170cf" },
   { label: "BofA Red", hex: "#e31837" },
   { label: "PayPal Navy", hex: "#003087" },
-  { label: "Google Blue", hex: "#4285f4" },
   { label: "Emerald Cash", hex: "#10b981" },
   { label: "Mastercard Orange", hex: "#eb001b" },
-  { label: "Amex Cyan", hex: "#006fcf" },
   { label: "Titanium Slate", hex: "#475569" },
-  { label: "Velvet Purple", hex: "#8b5cf6" },
   { label: "Onyx Black", hex: "#1c1c1e" },
 ];
 
@@ -54,9 +55,12 @@ export function AccountModal({
   const [type, setType] = useState<AccountType>("bank");
   const [name, setName] = useState("");
   const [institutionName, setInstitutionName] = useState("");
-  const [initialBalance, setInitialBalance] = useState("0");
+  const [openingBalance, setOpeningBalance] = useState("0");
+  const [openingBalanceDate, setOpeningBalanceDate] = useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
   const [maskLast4, setMaskLast4] = useState("");
-  const [color, setColor] = useState("#1170cf");
+  const [color, setColor] = useState("#7E30E1");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,16 +69,26 @@ export function AccountModal({
       setType(accountToEdit.type);
       setName(accountToEdit.name);
       setInstitutionName(accountToEdit.institution_name || "");
-      setInitialBalance(String(accountToEdit.initial_balance ?? 0));
+      const bal =
+        accountToEdit.opening_balance ?? accountToEdit.initial_balance ?? 0;
+      setOpeningBalance(String(bal));
+      setOpeningBalanceDate(
+        accountToEdit.opening_balance_date
+          ? new Date(accountToEdit.opening_balance_date)
+              .toISOString()
+              .slice(0, 10)
+          : new Date().toISOString().slice(0, 10)
+      );
       setMaskLast4(accountToEdit.mask_last4 || "");
-      setColor(accountToEdit.color || "#1170cf");
+      setColor(accountToEdit.color || "#7E30E1");
     } else {
       setType("bank");
       setName("");
       setInstitutionName("");
-      setInitialBalance("0");
+      setOpeningBalance("0");
+      setOpeningBalanceDate(new Date().toISOString().slice(0, 10));
       setMaskLast4("");
-      setColor("#1170cf");
+      setColor("#7E30E1");
     }
     setError(null);
   }, [accountToEdit, isOpen]);
@@ -98,7 +112,11 @@ export function AccountModal({
       return;
     }
 
-    const parsedBalance = parseFloat(initialBalance);
+    const parsedBalance = parseFloat(openingBalance);
+    const validBalance = isNaN(parsedBalance) ? 0 : parsedBalance;
+    const anchorDate = openingBalanceDate
+      ? new Date(openingBalanceDate).toISOString()
+      : new Date().toISOString();
 
     try {
       setIsSubmitting(true);
@@ -109,7 +127,9 @@ export function AccountModal({
           institution_name: institutionName.trim() || undefined,
           color: color || undefined,
           mask_last4: maskLast4.trim() ? maskLast4.trim().slice(-4) : undefined,
-          initial_balance: isNaN(parsedBalance) ? 0 : parsedBalance,
+          initial_balance: validBalance,
+          opening_balance: validBalance,
+          opening_balance_date: anchorDate,
         },
         accountToEdit?.id
       );
@@ -224,61 +244,78 @@ export function AccountModal({
                 }
               }}
               required
-              className="w-full px-3.5 py-2 rounded-xl border border-input bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+              className="w-full px-3.5 py-2 rounded-xl border border-input bg-background text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary shadow-sm text-foreground"
             />
           </div>
 
           {/* Institution / Brand Name */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Institution / Brand Brand
+              Institution / Brand Name
             </label>
             <input
               type="text"
-              placeholder="e.g. Chase, Apple, PayPal, Bank of America"
+              placeholder="e.g. Chase, Apple, PayPal, State Bank of India"
               value={institutionName}
               onChange={(e) => {
                 setInstitutionName(e.target.value);
                 const match = matchInstitution(e.target.value, type);
                 if (match) setColor(match.color);
               }}
-              className="w-full px-3.5 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+              className="w-full px-3.5 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-sm text-foreground"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {/* Initial / Starting Balance */}
+            {/* Opening Balance */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Initial Balance
+                Opening Balance
               </label>
               <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
                   type="number"
                   step="0.01"
                   placeholder="0.00"
-                  value={initialBalance}
-                  onChange={(e) => setInitialBalance(e.target.value)}
-                  className="w-full pl-8 pr-3 py-2 rounded-xl border border-input bg-background text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+                  value={openingBalance}
+                  onChange={(e) => setOpeningBalance(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 rounded-xl border border-input bg-background text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary shadow-sm text-foreground"
                 />
               </div>
             </div>
 
-            {/* Last 4 Digits (Optional) */}
+            {/* Opening Balance Anchor Date */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Last 4 Digits
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Calendar className="h-3 w-3 text-primary" />
+                As Of Date
               </label>
               <input
-                type="text"
-                maxLength={4}
-                placeholder="e.g. 4821"
-                value={maskLast4}
-                onChange={(e) => setMaskLast4(e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl border border-input bg-background text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-primary shadow-sm"
+                type="date"
+                value={openingBalanceDate}
+                onChange={(e) => setOpeningBalanceDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary shadow-sm text-foreground"
               />
             </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Historical notebook entries backdated prior to this anchor date will be tracked in analytics without deducting from your opening balance.
+          </p>
+
+          {/* Last 4 Digits (Optional) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Last 4 Digits (Optional)
+            </label>
+            <input
+              type="text"
+              maxLength={4}
+              placeholder="e.g. 4821"
+              value={maskLast4}
+              onChange={(e) => setMaskLast4(e.target.value)}
+              className="w-full px-3.5 py-2 rounded-xl border border-input bg-background text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-primary shadow-sm text-foreground"
+            />
           </div>
 
           {/* Card Accent Color */}

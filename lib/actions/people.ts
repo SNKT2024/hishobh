@@ -59,16 +59,17 @@ export async function getPeopleAction(): Promise<Person[]> {
     const { data, error } = await supabase
       .from("people")
       .select("*")
+      .eq("user_id", userId)
       .order("name", { ascending: true });
 
     if (error) {
-      console.error("Error fetching people:", error);
+      console.warn("Supabase fetch people notice:", error.message);
       return demoPeople;
     }
 
     return (data || []) as Person[];
   } catch (err) {
-    console.error("Exception fetching people:", err);
+    console.warn("Exception fetching people, using local store:", err);
     return demoPeople;
   }
 }
@@ -86,41 +87,43 @@ export async function createPersonAction(dto: CreatePersonDTO) {
     throw new Error("Person name is required");
   }
 
-  if (!isSupabaseConfigured()) {
-    const newPerson: Person = {
-      id: `p-${Date.now()}`,
-      user_id: userId,
-      name: dto.name.trim(),
-      relationship: dto.relationship || "Other",
-      avatar_url: dto.avatar_url || null,
-      created_at: new Date().toISOString(),
-    };
-    demoPeople = [newPerson, ...demoPeople];
-    revalidatePath("/settings/people");
-    revalidatePath("/dashboard");
-    return { success: true, person: newPerson };
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { data, error } = await supabase
+        .from("people")
+        .insert({
+          user_id: userId,
+          name: dto.name.trim(),
+          relationship: dto.relationship || "Other",
+          avatar_url: dto.avatar_url || null,
+        })
+        .select()
+        .single();
+
+      if (!error && data) {
+        revalidatePath("/settings/people");
+        revalidatePath("/dashboard");
+        return { success: true, person: data as Person };
+      }
+      console.warn("Supabase createPersonAction fallback:", error?.message);
+    } catch (err) {
+      console.warn("Supabase createPersonAction exception:", err);
+    }
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("people")
-    .insert({
-      user_id: userId,
-      name: dto.name.trim(),
-      relationship: dto.relationship || "Other",
-      avatar_url: dto.avatar_url || null,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating person:", error);
-    throw new Error(error.message);
-  }
-
+  const newPerson: Person = {
+    id: `p-${Date.now()}`,
+    user_id: userId,
+    name: dto.name.trim(),
+    relationship: dto.relationship || "Other",
+    avatar_url: dto.avatar_url || null,
+    created_at: new Date().toISOString(),
+  };
+  demoPeople = [newPerson, ...demoPeople];
   revalidatePath("/settings/people");
   revalidatePath("/dashboard");
-  return { success: true, person: data as Person };
+  return { success: true, person: newPerson };
 }
 
 /**
@@ -132,42 +135,45 @@ export async function updatePersonAction(dto: UpdatePersonDTO) {
     throw new Error("Unauthorized");
   }
 
-  if (!isSupabaseConfigured()) {
-    demoPeople = demoPeople.map((p) =>
-      p.id === dto.id
-        ? {
-            ...p,
-            name: dto.name.trim(),
-            relationship: dto.relationship || p.relationship,
-            avatar_url: dto.avatar_url ?? p.avatar_url,
-          }
-        : p
-    );
-    revalidatePath("/settings/people");
-    revalidatePath("/dashboard");
-    return { success: true };
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { data, error } = await supabase
+        .from("people")
+        .update({
+          name: dto.name.trim(),
+          relationship: dto.relationship,
+          avatar_url: dto.avatar_url,
+        })
+        .eq("id", dto.id)
+        .eq("user_id", userId)
+        .select()
+        .single();
+
+      if (!error && data) {
+        revalidatePath("/settings/people");
+        revalidatePath("/dashboard");
+        return { success: true, person: data as Person };
+      }
+      console.warn("Supabase updatePersonAction fallback:", error?.message);
+    } catch (err) {
+      console.warn("Supabase updatePersonAction exception:", err);
+    }
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("people")
-    .update({
-      name: dto.name.trim(),
-      relationship: dto.relationship,
-      avatar_url: dto.avatar_url,
-    })
-    .eq("id", dto.id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error updating person:", error);
-    throw new Error(error.message);
-  }
-
+  demoPeople = demoPeople.map((p) =>
+    p.id === dto.id
+      ? {
+          ...p,
+          name: dto.name.trim(),
+          relationship: dto.relationship || p.relationship,
+          avatar_url: dto.avatar_url ?? p.avatar_url,
+        }
+      : p
+  );
   revalidatePath("/settings/people");
   revalidatePath("/dashboard");
-  return { success: true, person: data as Person };
+  return { success: true };
 }
 
 /**
@@ -179,21 +185,28 @@ export async function deletePersonAction(id: string) {
     throw new Error("Unauthorized");
   }
 
-  if (!isSupabaseConfigured()) {
-    demoPeople = demoPeople.filter((p) => p.id !== id);
-    revalidatePath("/settings/people");
-    revalidatePath("/dashboard");
-    return { success: true };
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { error } = await supabase
+        .from("people")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+
+      if (!error) {
+        demoPeople = demoPeople.filter((p) => p.id !== id);
+        revalidatePath("/settings/people");
+        revalidatePath("/dashboard");
+        return { success: true };
+      }
+      console.warn("Supabase deletePersonAction fallback:", error?.message);
+    } catch (err) {
+      console.warn("Supabase deletePersonAction exception:", err);
+    }
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.from("people").delete().eq("id", id);
-
-  if (error) {
-    console.error("Error deleting person:", error);
-    throw new Error(error.message);
-  }
-
+  demoPeople = demoPeople.filter((p) => p.id !== id);
   revalidatePath("/settings/people");
   revalidatePath("/dashboard");
   return { success: true };

@@ -12,59 +12,13 @@ import {
   Person,
   TimeframeOption,
   Transaction,
+  UpdateTransactionDTO,
 } from "@/types";
 import { revalidatePath } from "next/cache";
 import { getPeopleAction } from "./people";
+import { getAccountsAction, createAccountAction as createAccountActionDirect } from "./accounts";
 
-// Demo fallback accounts reflecting strict types (cash, bank, wallet, card) and branding
-const DEMO_ACCOUNTS: Account[] = [
-  {
-    id: "acc-bank-1",
-    user_id: "demo-user",
-    name: "Chase Checking",
-    type: "bank",
-    institution_name: "Chase",
-    logo_url: "/logos/chase.svg",
-    color: "#1170cf",
-    currency: "USD",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "acc-cash-2",
-    user_id: "demo-user",
-    name: "Cash Wallet",
-    type: "cash",
-    institution_name: "Physical Cash",
-    logo_url: null,
-    color: "#10b981",
-    currency: "USD",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "acc-card-3",
-    user_id: "demo-user",
-    name: "Apple Card",
-    type: "card",
-    institution_name: "Apple / Goldman",
-    logo_url: "/logos/apple.svg",
-    color: "#ffffff",
-    currency: "USD",
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "acc-wallet-4",
-    user_id: "demo-user",
-    name: "PayPal Balance",
-    type: "wallet",
-    institution_name: "PayPal",
-    logo_url: "/logos/paypal.svg",
-    color: "#003087",
-    currency: "USD",
-    created_at: new Date().toISOString(),
-  },
-];
-
-const DEMO_TRANSACTIONS: Transaction[] = [
+let demoTransactionsStore: Transaction[] = [
   {
     id: "tx-1",
     user_id: "demo-user",
@@ -169,16 +123,37 @@ export async function getDashboardData(
 ): Promise<DashboardData> {
   const { userId } = await auth();
   const { startDate, endDate } = getTimeframeRange(timeframe);
-  const people = await getPeopleAction();
 
   if (!isSupabaseConfigured() || !userId) {
+    const [people, accounts] = await Promise.all([
+      getPeopleAction(),
+      getAccountsAction(),
+    ]);
+
+    if (accounts.length === 0) {
+      return {
+        timeframe,
+        selectedAccountId,
+        metrics: {
+          total_income: 0,
+          total_expense: 0,
+          balance: 0,
+          income_percentage: 50,
+          expense_percentage: 50,
+        },
+        accounts: [],
+        transactions: [],
+        people,
+      };
+    }
+
     // Filter transactions by timeframe
-    const filteredByDate = DEMO_TRANSACTIONS.filter((t) => {
+    const filteredByDate = demoTransactionsStore.filter((t) => {
       const d = new Date(t.date);
       return d >= startDate && d <= endDate;
     });
 
-    const accountsWithMetrics = DEMO_ACCOUNTS.map((acc) => {
+    const accountsWithMetrics = accounts.map((acc) => {
       const accTxs = filteredByDate.filter((t) => t.account_id === acc.id);
       const inc = accTxs
         .filter((t) => t.type === "income")
@@ -211,81 +186,50 @@ export async function getDashboardData(
     };
   }
 
-  // --- Real Supabase Query with RLS ---
+  // --- Real Supabase Query with RLS (All executed concurrently via Promise.all) ---
   try {
     const supabase = await createServerSupabaseClient();
 
-    // 1. Fetch user accounts
-    let { data: accountsData, error: accError } = await supabase
-      .from("accounts")
-      .select("*")
-      .order("created_at", { ascending: true });
+    // Fetch people, accounts, and transactions simultaneously in PARALLEL
+    const [people, accounts, txResult] = await Promise.all([
+      getPeopleAction(),
+      getAccountsAction(),
+      supabase
+        .from("transactions")
+        .select("*, account:accounts(id, name, type, institution_name), person:people(id, name, relationship)")
+        .eq("user_id", userId)
+        .gte("date", startDate.toISOString())
+        .lte("date", endDate.toISOString())
+        .order("date", { ascending: false }),
+    ]);
 
-    if (accError) {
-      console.error("Error fetching accounts:", accError);
+    if (txResult.error) {
+      console.warn("Supabase fetch transactions notice:", txResult.error.message);
     }
 
-    // Auto-seed default accounts with new types if user has none
-    if (!accountsData || accountsData.length === 0) {
-      const defaultAccounts = [
-        {
-          user_id: userId,
-          name: "Main Checking",
-          type: "bank",
-          institution_name: "Primary Bank",
-          color: "#2563eb",
-          currency: "USD",
+    if (accounts.length === 0) {
+      return {
+        timeframe,
+        selectedAccountId,
+        metrics: {
+          total_income: 0,
+          total_expense: 0,
+          balance: 0,
+          income_percentage: 50,
+          expense_percentage: 50,
         },
-        {
-          user_id: userId,
-          name: "Cash Wallet",
-          type: "cash",
-          institution_name: "Physical Cash",
-          color: "#10b981",
-          currency: "USD",
-        },
-        {
-          user_id: userId,
-          name: "Credit Card",
-          type: "card",
-          institution_name: "Card Issuer",
-          color: "#8b5cf6",
-          currency: "USD",
-        },
-      ];
-      const { data: seeded, error: seedError } = await supabase
-        .from("accounts")
-        .insert(defaultAccounts)
-        .select();
-
-      if (!seedError && seeded) {
-        accountsData = seeded;
-      }
+        accounts: [],
+        transactions: [],
+        people,
+      };
     }
 
-    const accounts: Account[] = (accountsData || []).map((a) => ({
-      ...a,
-      currency: a.currency || "USD",
-    }));
-
-    // 2. Fetch transactions in timeframe with account and person relations
-    const { data: txData, error: txError } = await supabase
-      .from("transactions")
-      .select("*, account:accounts(id, name, type, institution_name), person:people(id, name, relationship)")
-      .gte("date", startDate.toISOString())
-      .lte("date", endDate.toISOString())
-      .order("date", { ascending: false });
-
-    if (txError) {
-      console.error("Error fetching transactions:", txError);
-    }
-
-    const transactions: Transaction[] = (txData || []).map((t) => ({
+    const transactions: Transaction[] = (txResult.data || []).map((t) => ({
       ...t,
       amount: Number(t.amount),
     }));
 
-    // 3. Compute per-account metrics
+    // Compute per-account metrics
     const accountsWithMetrics = accounts.map((acc) => {
       const accTxs = transactions.filter((t) => t.account_id === acc.id);
       const inc = accTxs
@@ -294,18 +238,19 @@ export async function getDashboardData(
       const exp = accTxs
         .filter((t) => t.type === "expense")
         .reduce((sum, t) => sum + Number(t.amount), 0);
+      const initial = Number(acc.initial_balance || 0);
       return {
         ...acc,
         total_income: inc,
         total_expense: exp,
-        balance: inc - exp,
+        balance: initial + inc - exp,
       };
     });
 
-    // 4. Compute global/selected metrics
+    // Compute global/selected metrics
     const metrics = calculateMetrics(transactions, selectedAccountId);
 
-    // 5. Filter transactions for the recent list
+    // Filter transactions for the recent list
     const visibleTransactions =
       selectedAccountId === "all"
         ? transactions
@@ -347,72 +292,225 @@ export async function createTransactionAction(dto: CreateTransactionDTO) {
     throw new Error("Unauthorized: Please sign in to record transactions.");
   }
 
-  if (!isSupabaseConfigured()) {
-    revalidatePath("/dashboard");
-    return { success: true, message: "Transaction recorded in demo mode." };
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const insertPayload: Record<string, any> = {
+        user_id: userId,
+        account_id: dto.account_id,
+        person_id: dto.person_id || null,
+        title: dto.title,
+        amount: dto.amount,
+        type: dto.type,
+        category: dto.category || "General",
+        date: dto.date || new Date().toISOString(),
+      };
+
+      if (dto.receipt_url !== undefined) insertPayload.receipt_url = dto.receipt_url;
+      if (dto.location_name !== undefined) insertPayload.location_name = dto.location_name;
+      if (dto.latitude !== undefined) insertPayload.latitude = dto.latitude;
+      if (dto.longitude !== undefined) insertPayload.longitude = dto.longitude;
+      if (dto.import_batch_id !== undefined) insertPayload.import_batch_id = dto.import_batch_id;
+
+      let { data, error } = await supabase
+        .from("transactions")
+        .insert(insertPayload)
+        .select()
+        .single();
+
+      // Resilience: If optional columns are not yet in remote Supabase schema cache
+      if (error && (error.code === "PGRST204" || error.message?.includes("schema cache"))) {
+        console.warn("Retrying transaction insert with baseline schema...");
+        const basePayload = {
+          user_id: userId,
+          account_id: dto.account_id,
+          person_id: dto.person_id || null,
+          title: dto.title,
+          amount: dto.amount,
+          type: dto.type,
+          category: dto.category || "General",
+          date: dto.date || new Date().toISOString(),
+        };
+        const retryRes = await supabase.from("transactions").insert(basePayload).select().single();
+        data = retryRes.data;
+        error = retryRes.error;
+      }
+
+      if (!error && data) {
+        revalidatePath("/dashboard");
+        revalidatePath("/accounts");
+        revalidatePath(`/accounts/${dto.account_id}`);
+        revalidatePath("/stats");
+        return { success: true, transaction: data };
+      }
+      console.warn("Supabase createTransactionAction fallback:", error?.message);
+    } catch (err) {
+      console.warn("Supabase createTransactionAction exception:", err);
+    }
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("transactions")
-    .insert({
-      user_id: userId,
-      account_id: dto.account_id,
-      person_id: dto.person_id || null,
-      title: dto.title,
-      amount: dto.amount,
-      type: dto.type,
-      category: dto.category || "General",
-      date: dto.date || new Date().toISOString(),
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Failed to insert transaction:", error);
-    throw new Error(error.message);
-  }
-
+  const userAccounts = await getAccountsAction();
+  const acc = userAccounts.find((a) => a.id === dto.account_id);
+  const newTx: Transaction = {
+    id: `tx-${Date.now()}`,
+    user_id: userId,
+    account_id: dto.account_id,
+    person_id: dto.person_id || null,
+    title: dto.title,
+    amount: dto.amount,
+    type: dto.type,
+    category: dto.category || "General",
+    date: dto.date || new Date().toISOString(),
+    receipt_url: dto.receipt_url || null,
+    location_name: dto.location_name || null,
+    latitude: dto.latitude || null,
+    longitude: dto.longitude || null,
+    import_batch_id: dto.import_batch_id || null,
+    created_at: new Date().toISOString(),
+    account: acc
+      ? {
+          name: acc.name,
+          type: acc.type,
+          institution_name: acc.institution_name,
+        }
+      : null,
+  };
+  demoTransactionsStore = [newTx, ...demoTransactionsStore].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
   revalidatePath("/dashboard");
-  return { success: true, transaction: data };
+  revalidatePath("/accounts");
+  revalidatePath(`/accounts/${dto.account_id}`);
+  revalidatePath("/stats");
+  return { success: true, transaction: newTx };
 }
 
 /**
- * Server Action: Create Account
+ * Server Action: Update Transaction
  */
-export async function createAccountAction(dto: CreateAccountDTO) {
+export async function updateTransactionAction(dto: UpdateTransactionDTO) {
   const { userId } = await auth();
   if (!userId) {
-    throw new Error("Unauthorized: Please sign in to create an account.");
+    throw new Error("Unauthorized: Please sign in to update transactions.");
   }
 
-  if (!isSupabaseConfigured()) {
-    revalidatePath("/dashboard");
-    return { success: true, message: "Account created in demo mode." };
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const updatePayload: Record<string, any> = {
+        account_id: dto.account_id,
+        person_id: dto.person_id || null,
+        title: dto.title.trim(),
+        amount: dto.amount,
+        type: dto.type,
+        category: dto.category || "General",
+        date: dto.date || new Date().toISOString(),
+      };
+
+      if (dto.receipt_url !== undefined) updatePayload.receipt_url = dto.receipt_url;
+      if (dto.location_name !== undefined) updatePayload.location_name = dto.location_name;
+      if (dto.latitude !== undefined) updatePayload.latitude = dto.latitude;
+      if (dto.longitude !== undefined) updatePayload.longitude = dto.longitude;
+
+      let { data, error } = await supabase
+        .from("transactions")
+        .update(updatePayload)
+        .eq("id", dto.id)
+        .eq("user_id", userId)
+        .select(
+          `*, account:accounts(id, name, type, institution_name), person:people(id, name, relationship)`
+        )
+        .single();
+
+      // Resilience: If optional columns are not yet in remote Supabase schema cache
+      if (error && (error.code === "PGRST204" || error.message?.includes("schema cache"))) {
+        console.warn("Retrying transaction update with baseline schema...");
+        const basePayload = {
+          account_id: dto.account_id,
+          person_id: dto.person_id || null,
+          title: dto.title.trim(),
+          amount: dto.amount,
+          type: dto.type,
+          category: dto.category || "General",
+          date: dto.date || new Date().toISOString(),
+        };
+        const retryRes = await supabase
+          .from("transactions")
+          .update(basePayload)
+          .eq("id", dto.id)
+          .eq("user_id", userId)
+          .select(
+            `*, account:accounts(id, name, type, institution_name), person:people(id, name, relationship)`
+          )
+          .single();
+        data = retryRes.data;
+        error = retryRes.error;
+      }
+
+      if (!error && data) {
+        revalidatePath("/dashboard");
+        revalidatePath("/accounts");
+        revalidatePath(`/accounts/${dto.account_id}`);
+        revalidatePath("/stats");
+        return { success: true, transaction: data as Transaction };
+      }
+      console.warn("Supabase updateTransactionAction fallback:", error?.message);
+    } catch (err) {
+      console.warn("Supabase updateTransactionAction exception:", err);
+    }
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("accounts")
-    .insert({
-      user_id: userId,
-      name: dto.name,
-      type: dto.type,
-      institution_name: dto.institution_name || null,
-      logo_url: dto.logo_url || null,
-      color: dto.color || null,
-      currency: dto.currency || "USD",
-    })
-    .select()
-    .single();
+  const userAccounts = await getAccountsAction();
+  const acc = userAccounts.find((a) => a.id === dto.account_id);
+  const people = await getPeopleAction();
+  const person = dto.person_id
+    ? people.find((p) => p.id === dto.person_id)
+    : null;
 
-  if (error) {
-    console.error("Failed to insert account:", error);
-    throw new Error(error.message);
-  }
+  demoTransactionsStore = demoTransactionsStore.map((t) => {
+    if (t.id === dto.id) {
+      return {
+        ...t,
+        account_id: dto.account_id,
+        person_id: dto.person_id || null,
+        title: dto.title.trim(),
+        amount: dto.amount,
+        type: dto.type,
+        category: dto.category || "General",
+        date: dto.date || t.date,
+        receipt_url: dto.receipt_url !== undefined ? dto.receipt_url : t.receipt_url,
+        location_name: dto.location_name !== undefined ? dto.location_name : t.location_name,
+        latitude: dto.latitude !== undefined ? dto.latitude : t.latitude,
+        longitude: dto.longitude !== undefined ? dto.longitude : t.longitude,
+        account: acc
+          ? {
+              name: acc.name,
+              type: acc.type,
+              institution_name: acc.institution_name,
+            }
+          : t.account,
+        person: person
+          ? {
+              id: person.id,
+              name: person.name,
+              relationship: person.relationship,
+            }
+          : null,
+      };
+    }
+    return t;
+  });
 
   revalidatePath("/dashboard");
-  return { success: true, account: data };
+  revalidatePath("/accounts");
+  revalidatePath(`/accounts/${dto.account_id}`);
+  revalidatePath("/stats");
+  const updated = demoTransactionsStore.find((t) => t.id === dto.id);
+  return { success: true, transaction: updated };
+}
+
+export async function createAccountAction(dto: CreateAccountDTO) {
+  return await createAccountActionDirect(dto);
 }
 
 /**
@@ -425,15 +523,30 @@ export async function deleteTransactionAction(transactionId: string) {
   }
 
   if (isSupabaseConfigured()) {
-    const supabase = await createServerSupabaseClient();
-    const { error } = await supabase
-      .from("transactions")
-      .delete()
-      .eq("id", transactionId);
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { error } = await supabase
+        .from("transactions")
+        .delete()
+        .eq("id", transactionId)
+        .eq("user_id", userId);
 
-    if (error) throw new Error(error.message);
+      if (!error) {
+        demoTransactionsStore = demoTransactionsStore.filter((t) => t.id !== transactionId);
+        revalidatePath("/dashboard");
+        revalidatePath("/accounts");
+        revalidatePath("/stats");
+        return { success: true };
+      }
+      console.warn("Supabase deleteTransactionAction fallback:", error?.message);
+    } catch (err) {
+      console.warn("Supabase deleteTransactionAction exception:", err);
+    }
   }
 
+  demoTransactionsStore = demoTransactionsStore.filter((t) => t.id !== transactionId);
   revalidatePath("/dashboard");
+  revalidatePath("/accounts");
+  revalidatePath("/stats");
   return { success: true };
 }

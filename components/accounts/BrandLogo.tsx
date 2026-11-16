@@ -229,7 +229,7 @@ export function BrandLogo({
       return (
         <div
           className={cn(
-            "rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/20",
+            "rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20",
             sizeClasses,
             className
           )}

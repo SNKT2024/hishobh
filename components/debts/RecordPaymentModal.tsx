@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { CreateDebtSettlementDTO, Debt } from "@/types";
 import { formatCurrency } from "@/lib/utils";
-import { CheckCircle2, DollarSign, Loader2 } from "lucide-react";
+import { CheckCircle2, IndianRupee, Loader2 } from "lucide-react";
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -24,7 +24,7 @@ export function RecordPaymentModal({
   isOpen,
   onClose,
   debt,
-  currency = "USD",
+  currency = "INR",
   onRecordPayment,
 }: RecordPaymentModalProps) {
   const [amount, setAmount] = useState("");
@@ -125,7 +125,7 @@ export function RecordPaymentModal({
             </div>
 
             <div className="relative">
-              <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <IndianRupee className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <input
                 type="number"
                 step="0.01"

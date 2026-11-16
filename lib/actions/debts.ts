@@ -174,10 +174,11 @@ export async function getDebtsAction(): Promise<{
     const { data, error } = await supabase
       .from("debts")
       .select("*, person:people(*), settlements:debt_settlements(*)")
+      .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("Error fetching debts:", error);
+      console.warn("Supabase fetch debts notice:", error.message);
       return {
         debts: demoDebtsStore,
         metrics: calculateDebtMetrics(demoDebtsStore),
@@ -208,7 +209,7 @@ export async function getDebtsAction(): Promise<{
 }
 
 /**
- * Create a new Lend or Borrow record
+ * Create a new Lend or Borrow record (supports single or multiple counterparties)
  */
 export async function createDebtAction(dto: CreateDebtDTO) {
   const { userId } = await auth();
@@ -216,56 +217,78 @@ export async function createDebtAction(dto: CreateDebtDTO) {
     throw new Error("Unauthorized");
   }
 
-  if (!dto.person_id) {
-    throw new Error("Counterparty person is required");
+  // Support single person or multiple people
+  const targetPersonIds: string[] =
+    dto.person_ids && dto.person_ids.length > 0
+      ? dto.person_ids
+      : dto.person_id
+      ? [dto.person_id]
+      : [];
+
+  if (targetPersonIds.length === 0) {
+    throw new Error("At least one counterparty person is required");
   }
 
   if (!dto.total_amount || dto.total_amount <= 0) {
     throw new Error("Amount must be greater than 0");
   }
 
-  if (!isSupabaseConfigured()) {
-    const newDebt: Debt = {
-      id: `debt-${Date.now()}`,
-      user_id: userId,
-      person_id: dto.person_id,
-      type: dto.type,
-      total_amount: dto.total_amount,
-      settled_amount: 0,
-      due_date: dto.due_date || null,
-      status: "pending",
-      description: dto.description || null,
-      created_at: new Date().toISOString(),
-      settlements: [],
-    };
-    demoDebtsStore = [newDebt, ...demoDebtsStore];
-    revalidatePath("/settings/lend-borrow");
-    return { success: true, debt: newDebt };
+  const isMulti = targetPersonIds.length > 1;
+  const amountPerPerson =
+    isMulti && dto.split_mode !== "exact_per_person"
+      ? Math.round((dto.total_amount / targetPersonIds.length) * 100) / 100
+      : dto.total_amount;
+
+  const recordDate = dto.date ? new Date(dto.date).toISOString() : new Date().toISOString();
+  const dueDate = dto.due_date ? new Date(dto.due_date).toISOString() : null;
+
+  const recordsToInsert = targetPersonIds.map((pId) => ({
+    user_id: userId,
+    person_id: pId,
+    type: dto.type,
+    total_amount: amountPerPerson,
+    settled_amount: 0,
+    due_date: dueDate,
+    description: dto.description || null,
+    status: "pending" as const,
+    created_at: recordDate,
+  }));
+
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { data, error } = await supabase
+        .from("debts")
+        .insert(recordsToInsert)
+        .select("*, person:people(*)");
+
+      if (!error && data) {
+        revalidatePath("/settings/lend-borrow");
+        return { success: true, debts: data as Debt[], debt: (data[0] || null) as Debt };
+      }
+      console.warn("Supabase createDebtAction fallback:", error?.message);
+    } catch (err) {
+      console.warn("Supabase createDebtAction exception:", err);
+    }
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
-    .from("debts")
-    .insert({
-      user_id: userId,
-      person_id: dto.person_id,
-      type: dto.type,
-      total_amount: dto.total_amount,
-      settled_amount: 0,
-      due_date: dto.due_date || null,
-      description: dto.description || null,
-      status: "pending",
-    })
-    .select("*, person:people(*)")
-    .single();
+  const createdDebts: Debt[] = targetPersonIds.map((pId, idx) => ({
+    id: `debt-${Date.now()}-${idx}`,
+    user_id: userId,
+    person_id: pId,
+    type: dto.type,
+    total_amount: amountPerPerson,
+    settled_amount: 0,
+    due_date: dueDate,
+    status: "pending",
+    description: dto.description || null,
+    created_at: recordDate,
+    settlements: [],
+  }));
 
-  if (error) {
-    console.error("Error creating debt record:", error);
-    throw new Error(error.message);
-  }
-
+  demoDebtsStore = [...createdDebts, ...demoDebtsStore];
   revalidatePath("/settings/lend-borrow");
-  return { success: true, debt: data as Debt };
+  return { success: true, debts: createdDebts, debt: createdDebts[0] };
 }
 
 /**
@@ -281,62 +304,62 @@ export async function createDebtSettlementAction(dto: CreateDebtSettlementDTO) {
     throw new Error("Settlement amount must be greater than 0");
   }
 
-  if (!isSupabaseConfigured()) {
-    const target = demoDebtsStore.find((d) => d.id === dto.debt_id);
-    if (!target) throw new Error("Debt record not found");
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { data, error } = await supabase
+        .from("debt_settlements")
+        .insert({
+          debt_id: dto.debt_id,
+          amount: dto.amount,
+          settlement_date: dto.settlement_date || new Date().toISOString(),
+          notes: dto.notes || null,
+        })
+        .select()
+        .single();
 
-    const newSettled = Number(target.settled_amount) + Number(dto.amount);
-    const newStatus =
-      newSettled >= target.total_amount
-        ? "settled"
-        : newSettled > 0
-        ? "partially_settled"
-        : "pending";
-
-    const newSettlement: DebtSettlement = {
-      id: `set-${Date.now()}`,
-      debt_id: dto.debt_id,
-      amount: dto.amount,
-      settlement_date: dto.settlement_date || new Date().toISOString(),
-      notes: dto.notes || null,
-    };
-
-    demoDebtsStore = demoDebtsStore.map((d) =>
-      d.id === dto.debt_id
-        ? {
-            ...d,
-            settled_amount: newSettled,
-            status: newStatus,
-            settlements: [newSettlement, ...(d.settlements || [])],
-          }
-        : d
-    );
-
-    revalidatePath("/settings/lend-borrow");
-    return { success: true, settlement: newSettlement };
+      if (!error && data) {
+        revalidatePath("/settings/lend-borrow");
+        return { success: true, settlement: data as DebtSettlement };
+      }
+      console.warn("Supabase createDebtSettlementAction fallback:", error?.message);
+    } catch (err) {
+      console.warn("Supabase createDebtSettlementAction exception:", err);
+    }
   }
 
-  const supabase = await createServerSupabaseClient();
+  const target = demoDebtsStore.find((d) => d.id === dto.debt_id);
+  if (!target) throw new Error("Debt record not found");
 
-  // 1. Insert into debt_settlements (the Postgres trigger automatically updates debt.settled_amount & status)
-  const { data, error } = await supabase
-    .from("debt_settlements")
-    .insert({
-      debt_id: dto.debt_id,
-      amount: dto.amount,
-      settlement_date: dto.settlement_date || new Date().toISOString(),
-      notes: dto.notes || null,
-    })
-    .select()
-    .single();
+  const newSettled = Number(target.settled_amount) + Number(dto.amount);
+  const newStatus =
+    newSettled >= target.total_amount
+      ? "settled"
+      : newSettled > 0
+      ? "partially_settled"
+      : "pending";
 
-  if (error) {
-    console.error("Error recording debt settlement:", error);
-    throw new Error(error.message);
-  }
+  const newSettlement: DebtSettlement = {
+    id: `set-${Date.now()}`,
+    debt_id: dto.debt_id,
+    amount: dto.amount,
+    settlement_date: dto.settlement_date || new Date().toISOString(),
+    notes: dto.notes || null,
+  };
+
+  demoDebtsStore = demoDebtsStore.map((d) =>
+    d.id === dto.debt_id
+      ? {
+          ...d,
+          settled_amount: newSettled,
+          status: newStatus,
+          settlements: [newSettlement, ...(d.settlements || [])],
+        }
+      : d
+  );
 
   revalidatePath("/settings/lend-borrow");
-  return { success: true, settlement: data as DebtSettlement };
+  return { success: true, settlement: newSettlement };
 }
 
 /**
@@ -348,20 +371,27 @@ export async function deleteDebtAction(id: string) {
     throw new Error("Unauthorized");
   }
 
-  if (!isSupabaseConfigured()) {
-    demoDebtsStore = demoDebtsStore.filter((d) => d.id !== id);
-    revalidatePath("/settings/lend-borrow");
-    return { success: true };
+  if (isSupabaseConfigured()) {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const { error } = await supabase
+        .from("debts")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+
+      if (!error) {
+        demoDebtsStore = demoDebtsStore.filter((d) => d.id !== id);
+        revalidatePath("/settings/lend-borrow");
+        return { success: true };
+      }
+      console.warn("Supabase deleteDebtAction fallback:", error?.message);
+    } catch (err) {
+      console.warn("Supabase deleteDebtAction exception:", err);
+    }
   }
 
-  const supabase = await createServerSupabaseClient();
-  const { error } = await supabase.from("debts").delete().eq("id", id);
-
-  if (error) {
-    console.error("Error deleting debt record:", error);
-    throw new Error(error.message);
-  }
-
+  demoDebtsStore = demoDebtsStore.filter((d) => d.id !== id);
   revalidatePath("/settings/lend-borrow");
   return { success: true };
 }

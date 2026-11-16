@@ -12,8 +12,10 @@ export function useSupabase() {
   const { session } = useSession();
 
   const supabase = useMemo(() => {
+    const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseUrl = rawUrl.replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
     return createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      supabaseUrl,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         async accessToken() {

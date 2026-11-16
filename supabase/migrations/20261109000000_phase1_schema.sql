@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS accounts (
   user_id TEXT NOT NULL,
   name TEXT NOT NULL,
   type account_type NOT NULL DEFAULT 'bank',
-  currency TEXT NOT NULL DEFAULT 'USD',
+  currency TEXT NOT NULL DEFAULT 'INR',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

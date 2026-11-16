@@ -1,4 +1,4 @@
-import Link from "next/dynamic";
+import Image from "next/image";
 import {
   SignedIn,
   SignedOut,
@@ -7,22 +7,30 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import { Wallet } from "lucide-react";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { PwaInstallButton } from "@/components/shared/PwaInstallButton";
 
 export function SharedHeader() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container max-w-6xl mx-auto flex h-16 items-center justify-between px-4 sm:px-8">
-        <a href="/" className="flex items-center gap-2 font-bold text-xl tracking-tight">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-            <Wallet className="h-5 w-5" />
-          </div>
-          <span className="bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+        <a href="/" className="flex items-center gap-2.5 font-bold text-xl tracking-tight group">
+          <Image
+            src="/icons/apple-icon.png"
+            alt="Hishobh Logo"
+            width={36}
+            height={36}
+            className="h-9 w-9 rounded-xl object-contain shadow-xs group-hover:scale-105 transition-transform"
+            priority
+          />
+          <span className="text-foreground font-black tracking-tight">
             Hishobh
           </span>
         </a>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          <PwaInstallButton variant="header" />
+          <ThemeToggle variant="icon" />
           <SignedOut>
             <SignInButton mode="modal">
               <Button variant="ghost" size="sm">
@@ -40,7 +48,7 @@ export function SharedHeader() {
                 Dashboard
               </Button>
             </a>
-            <UserButton afterSignOutUrl="/" />
+            <UserButton />
           </SignedIn>
         </div>
       </div>

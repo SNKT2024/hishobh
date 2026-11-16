@@ -10,8 +10,8 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  DollarSign,
   History,
+  IndianRupee,
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,7 @@ interface DebtCardProps {
 
 export function DebtCard({
   debt,
-  currency = "USD",
+  currency = "INR",
   onOpenRecordPayment,
   onDeleteDebt,
 }: DebtCardProps) {
@@ -83,7 +83,7 @@ export function DebtCard({
       {/* Header: Person & Status */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="h-11 w-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 text-white font-bold flex items-center justify-center shrink-0 shadow-sm text-sm">
+          <div className="h-11 w-11 rounded-2xl bg-secondary text-secondary-foreground font-bold flex items-center justify-center shrink-0 border border-border shadow-xs text-sm">
             {getInitials(debt.person?.name)}
           </div>
           <div className="min-w-0">
@@ -162,7 +162,7 @@ export function DebtCard({
               debt.status === "settled"
                 ? "bg-emerald-500"
                 : debt.type === "lend"
-                ? "bg-violet-600"
+                ? "bg-primary"
                 : "bg-amber-500"
             )}
             style={{ width: `${percentSettled}%` }}
@@ -219,7 +219,7 @@ export function DebtCard({
               onClick={() => onOpenRecordPayment(debt)}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-transform active:scale-95"
             >
-              <DollarSign className="h-3.5 w-3.5" />
+              <IndianRupee className="h-3.5 w-3.5" />
               Record Payment
             </button>
           )}

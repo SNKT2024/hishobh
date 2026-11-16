@@ -6,7 +6,8 @@ import { createClient } from "@supabase/supabase-js";
  * operations where administrative privilege is strictly needed.
  */
 export function createAdminSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const rawUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseUrl = rawUrl.replace(/\/rest\/v1\/?$/, "").replace(/\/$/, "");
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
   if (!serviceRoleKey) {
